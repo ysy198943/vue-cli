@@ -1,19 +1,34 @@
 #!/usr/bin/env node
-
+// 下载远程仓库 => 远程拉取GitHub内的配置
 const download = require('download-git-repo')
+// 命令行处理工具
 const program = require('commander')
+// node下的文件操作系统中existsSync - 监测是否存在该路径
 const exists = require('fs').existsSync
+// node自带模块，拼接路径
 const path = require('path')
+// 命令行中的加载效果
 const ora = require('ora')
+// 获取用户根目录
 const home = require('user-home')
+// 绝对路径替换成带波浪号
 const tildify = require('tildify')
+// 高亮
 const chalk = require('chalk')
+// ** 用户与脚本命令行交互 | 面试必问
 const inquirer = require('inquirer')
+// rm -rf js版本
 const rm = require('rimraf').sync
+
+// 统一打印
 const logger = require('../lib/logger')
+// 根据模板构建项目
 const generate = require('../lib/generate')
+// 根据脚手架版本，检测版本
 const checkVersion = require('../lib/check-version')
+// 告警
 const warnings = require('../lib/warnings')
+// 路径处理
 const localPath = require('../lib/local-path')
 
 const isLocalPath = localPath.isLocalPath
@@ -22,7 +37,7 @@ const getTemplatePath = localPath.getTemplatePath
 /**
  * Usage.
  */
-
+// 面试：如何使用本地模板，预设模板？阻止远端更新官方模板行为？ --offline
 program
   .usage('<template-name> [project-name]')
   .option('-c, --clone', 'use git clone')
@@ -54,18 +69,25 @@ function help () {
 help()
 
 /**
- * Settings.
+ * Settings.解读：环境主要设置模块
  */
-
-let template = program.args[0]
+// 解读：获取到用户输入的参数 - program.args
+let template = program.args[0] // 模板名称
+// 判断是否包含斜杠 => 只要是存在 / 就当成有路径层级 => 非官方默认预制模板
 const hasSlash = template.indexOf('/') > -1
+// 项目名称
 const rawName = program.args[1]
+// 判断输入是否为空 => 是否以当前文件目录作为项目根目录
 const inPlace = !rawName || rawName === '.'
+// 调整当前目录作为构建目录的根目录
 const name = inPlace ? path.relative('../', process.cwd()) : rawName
+
 const to = path.resolve(rawName || '.')
 const clone = program.clone || false
 
+// 本地目录模板仓库路径拼接
 const tmp = path.join(home, '.vue-templates', template.replace(/[\/:]/g, '-'))
+// --offline
 if (program.offline) {
   console.log(`> Use cached template at ${chalk.yellow(tildify(tmp))}`)
   template = tmp
@@ -80,7 +102,9 @@ process.on('exit', () => {
   console.log()
 })
 
+// 是否在当前目录下构建 || 存在传入路径
 if (inPlace || exists(to)) {
+  // 与用户进行交互
   inquirer.prompt([{
     type: 'confirm',
     message: inPlace
@@ -98,13 +122,16 @@ if (inPlace || exists(to)) {
 
 /**
  * Check, download and generate the project.
+ * 下载、生成项目
  */
 
 function run () {
   // check if template is local
+  // 确认本地路径是否存在当前模板
   if (isLocalPath(template)) {
     const templatePath = getTemplatePath(template)
     if (exists(templatePath)) {
+      // 直接通过模板生成
       generate(name, templatePath, to, err => {
         if (err) logger.fatal(err)
         console.log()
@@ -114,10 +141,14 @@ function run () {
       logger.fatal('Local template "%s" not found.', template)
     }
   } else {
+    // 非本地模板
+    // 检查版本号
     checkVersion(() => {
+      // 判断是官方预制的还是第三方提供的
       if (!hasSlash) {
         // use official templates
         const officialTemplate = 'vuejs-templates/' + template
+        // # 模板可用
         if (template.indexOf('#') !== -1) {
           downloadAndGenerate(officialTemplate)
         } else {
@@ -143,9 +174,11 @@ function run () {
  */
 
 function downloadAndGenerate (template) {
+  // 添加进度条
   const spinner = ora('downloading template')
   spinner.start()
   // Remove if local template exists
+  // 本地模板先删除
   if (exists(tmp)) rm(tmp)
   download(template, tmp, { clone }, err => {
     spinner.stop()
